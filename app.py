@@ -8,6 +8,7 @@ from typing import List
 import streamlit as st
 
 from ai_model import summarize_medical_pages
+from cache import find_similar_question, get_cache_stats, save_conversation
 from scraper import available_sources, scrape_medical_info
 
 LOGGER = logging.getLogger(__name__)
