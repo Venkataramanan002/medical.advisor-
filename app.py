@@ -23,6 +23,16 @@ def run_app() -> None:
         "and Mayo Clinic content. All processing happens locally."
     )
 
+    # Sidebar: Cache stats and brief help
+    with st.sidebar:
+        st.header("Cache")
+        stats = get_cache_stats()
+        st.write(f"Saved Q&A: {stats['total_entries']}")
+        st.write(f"Queries processed: {stats['total_queries']}")
+        st.caption(
+            "Cached answers are reused for similar questions to improve speed."
+        )
+
     with st.expander("Trusted sources"):
         for url in available_sources():
             st.markdown(f"- [{url}]({url})")
@@ -40,18 +50,29 @@ def run_app() -> None:
         if not user_input.strip():
             st.warning("Please enter a question before requesting advice.")
         else:
-            with st.spinner("Analysing trusted sources..."):
-                pages_content: List[str] = scrape_medical_info(user_input)
+            # Try cache first for similar questions
+            cached = find_similar_question(user_input)
+            if cached:
+                cached_answer, similarity = cached
+                st.info(
+                    f"Reused cached advice (similarity: {similarity*100:.0f}%)."
+                )
+                st.session_state.history.append((user_input, cached_answer))
+            else:
+                with st.spinner("Analysing trusted sources..."):
+                    pages_content: List[str] = scrape_medical_info(user_input)
 
-                if not pages_content:
-                    st.error(
-                        "Unable to retrieve information right now. Try a "
-                        "different question or check your internet connection."
-                    )
-                else:
-                    reply = summarize_medical_pages(pages_content, user_input)
-                    st.session_state.history.append((user_input, reply))
-                    st.success("Advice ready!")
+                    if not pages_content:
+                        st.error(
+                            "Unable to retrieve information right now. Try a "
+                            "different question or check your internet connection."
+                        )
+                    else:
+                        reply = summarize_medical_pages(pages_content, user_input)
+                        st.session_state.history.append((user_input, reply))
+                        # Persist to cache for future reuse
+                        save_conversation(user_input, reply)
+                        st.success("Advice ready!")
 
     if st.session_state.history:
         st.divider()
